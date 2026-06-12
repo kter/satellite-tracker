@@ -1,0 +1,13 @@
+pre-commit:
+  commands:
+    format-check:
+      run: make format-check
+    lint:
+      run: make test-lint
+    unit-tests:
+      run: make test-unit
+
+pre-push:
+  commands:
+    unit-tests:
+      run: make test-unit

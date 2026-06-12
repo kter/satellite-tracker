@@ -1,0 +1,8 @@
+# Tool versions for the project. Run `mise install` after cloning.
+# Versions are pinned to concrete releases for reproducibility across
+# machines and CI — do not use "latest".
+[tools]
+node = "24.14.0"
+terraform = "1.15.5"
+awscli = "2.34.57"
+lefthook = "2.1.9"
