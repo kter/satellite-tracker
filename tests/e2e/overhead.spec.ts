@@ -25,6 +25,11 @@ test.describe('GPS overhead view (key feature)', () => {
       .poll(async () => (await satDebug(page)).overheadCount, { timeout: 15_000 })
       .toBeGreaterThan(0)
 
+    // highlighted overhead satellites get name labels on the overlay canvas
+    await expect
+      .poll(async () => (await satDebug(page)).labelCount, { timeout: 15_000 })
+      .toBeGreaterThan(0)
+
     // the button toggles back to the free camera
     await page.getByTestId('btn-overhead').click()
     await expect.poll(async () => (await satDebug(page)).cameraMode).toBe('free')

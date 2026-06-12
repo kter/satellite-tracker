@@ -6,6 +6,7 @@ export interface SatDebug {
   selectedNoradId: number | null
   selectedName: string | null
   overheadCount: number
+  labelCount: number
   cameraMode: string
   multiplier: number
   paused: boolean
@@ -32,6 +33,7 @@ export function installDebugApi(): void {
       selectedNoradId: idx !== null && s.catalog ? s.catalog.noradIds[idx] : null,
       selectedName: idx !== null && s.catalog ? s.catalog.names[idx] : null,
       overheadCount: s.overheadCount,
+      labelCount: s.labelCount,
       cameraMode: s.cameraMode,
       multiplier: s.clock.multiplier,
       paused: s.clock.paused,

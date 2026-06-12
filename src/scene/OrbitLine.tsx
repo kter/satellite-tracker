@@ -6,6 +6,11 @@ import { gstime } from 'satellite.js'
 import { useAppStore, currentSimTimeMs } from '../state/store'
 import { useOrbitStore, requestOrbit } from '../hooks/usePropagator'
 
+/** Resample once sim time drifts this far (fraction of a period) from the window center. */
+const RESAMPLE_PERIOD_FRACTION = 1 / 6
+/** Wall-clock throttle between orbit re-requests. */
+const RESAMPLE_MIN_WALL_MS = 1000
+
 /**
  * Orbit of the selected satellite, sampled in ECI by the worker. The group is
  * counter-rotated by -gmst(simTime) every frame so the ECI ellipse stays
@@ -16,6 +21,7 @@ export function OrbitLine() {
   const catalog = useAppStore((s) => s.catalog)
   const orbit = useOrbitStore()
   const groupRef = useRef<THREE.Group>(null)
+  const lastRequestWallMs = useRef(0)
 
   const selectedNoradId = selectedIndex !== null && catalog ? catalog.noradIds[selectedIndex] : null
 
@@ -37,8 +43,23 @@ export function OrbitLine() {
   }, [orbit.points, orbit.noradId, selectedNoradId])
 
   useFrame(() => {
+    const simMs = currentSimTimeMs()
     if (groupRef.current) {
-      groupRef.current.rotation.y = -gstime(new Date(currentSimTimeMs()))
+      groupRef.current.rotation.y = -gstime(new Date(simMs))
+    }
+    // The sampled window is centered on sampledAtMs; as sim time advances (or
+    // jumps at high multipliers) resample so the seam stays opposite the sat.
+    const o = useOrbitStore.getState()
+    if (selectedNoradId !== null && o.noradId === selectedNoradId && o.points && o.periodMin > 0) {
+      const driftMs = Math.abs(simMs - o.sampledAtMs)
+      const wallMs = performance.now()
+      if (
+        driftMs > o.periodMin * 60_000 * RESAMPLE_PERIOD_FRACTION &&
+        wallMs - lastRequestWallMs.current > RESAMPLE_MIN_WALL_MS
+      ) {
+        lastRequestWallMs.current = wallMs
+        requestOrbit(selectedNoradId)
+      }
     }
   })
 

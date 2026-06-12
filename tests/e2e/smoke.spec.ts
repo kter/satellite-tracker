@@ -7,7 +7,8 @@ test.describe('smoke', () => {
     await page.goto('/')
 
     await expect(page).toHaveTitle(/Orbital/)
-    await expect(page.locator('canvas')).toBeVisible()
+    // two canvases exist: the WebGL scene and the 2D label overlay
+    await expect(page.locator('canvas[data-engine^="three.js"]')).toBeVisible()
 
     await waitForReady(page)
     await expect(page.getByTestId('loading-overlay')).toBeHidden()

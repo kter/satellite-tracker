@@ -70,9 +70,11 @@ function sampleOrbit(noradId: number, samples: number, simTimeMs: number) {
   const periodMs = meta.periodMin * 60 * 1000
   // ECI ellipse (no per-sample gmst): the renderer counter-rotates the whole
   // line by -gmst(simTime) so it stays consistent with the Earth-fixed scene.
+  // The window is centered on simTimeMs (±T/2) so the open seam left by J2
+  // precession sits at the antipode instead of right at the satellite.
   const points = new Float32Array((samples + 1) * 3)
   for (let s = 0; s <= samples; s++) {
-    const t = simTimeMs + (periodMs * s) / samples
+    const t = simTimeMs + periodMs * (s / samples - 0.5)
     let pv: ReturnType<typeof propagate>
     try {
       pv = propagate(rec, new Date(t))
@@ -85,7 +87,9 @@ function sampleOrbit(noradId: number, samples: number, simTimeMs: number) {
     points[s * 3 + 1] = y
     points[s * 3 + 2] = z
   }
-  post({ type: 'orbit', noradId, periodMin: meta.periodMin, points }, [points.buffer])
+  post({ type: 'orbit', noradId, periodMin: meta.periodMin, sampledAtMs: simTimeMs, points }, [
+    points.buffer,
+  ])
 }
 
 onmessage = (ev: MessageEvent<MainToWorker>) => {

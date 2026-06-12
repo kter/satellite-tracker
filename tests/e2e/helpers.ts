@@ -51,6 +51,7 @@ interface SatDebug {
   selectedNoradId: number | null
   selectedName: string | null
   overheadCount: number
+  labelCount: number
   cameraMode: string
   multiplier: number
   paused: boolean

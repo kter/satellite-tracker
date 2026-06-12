@@ -47,7 +47,9 @@ export interface OrbitMessage {
   type: 'orbit'
   noradId: number
   periodMin: number
-  /** closed-loop ECI points in scene units, 3 floats per sample (transferred) */
+  /** sim time at the center of the sampling window (the satellite sits mid-line here) */
+  sampledAtMs: number
+  /** ECI points over one period centered on sampledAtMs, 3 floats per sample (transferred) */
   points: Float32Array
 }
 

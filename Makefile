@@ -70,6 +70,7 @@ tf-switch: ## Init backend for ENV and select matching workspace
 	@cd terraform && \
 	current=$$(terraform workspace show 2>/dev/null || echo none); \
 	if [ "$$current" != "$(ENV)" ]; then \
+		rm -f .terraform/environment && \
 		$(MISE) terraform init -reconfigure -backend-config=backends/$(ENV).hcl -input=false && \
 		($(MISE) terraform workspace select $(ENV) 2>/dev/null || $(MISE) terraform workspace new $(ENV)); \
 	fi
