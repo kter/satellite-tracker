@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
 import { EARTH_RADIUS_UNITS } from '../lib/geo'
 import { sunDirectionScene } from '../lib/sun'
-import { currentSimTimeMs } from '../state/store'
+import { currentSimTimeMs, useAppStore } from '../state/store'
 
 const VERTEX = /* glsl */ `
 varying vec3 vNormal;
@@ -34,8 +34,11 @@ void main() {
 
   vec3 day = texture2D(uDay, vUv).rgb;
   vec3 night = texture2D(uNight, vUv).rgb;
-  vec3 cityGlow = night * vec3(1.0, 0.82, 0.55) * 1.8;
-  vec3 col = mix(cityGlow, day * (0.25 + 0.75 * clamp(sunDot, 0.0, 1.0)), dayAmt);
+  vec3 cityGlow = night * vec3(1.0, 0.82, 0.55) * 1.6;
+  // keep continents readable on the dark side: faint cool ambient of the day map
+  vec3 nightSide = cityGlow + day * vec3(0.10, 0.12, 0.16);
+  vec3 daySide = day * (0.55 + 0.6 * clamp(sunDot, 0.0, 1.0));
+  vec3 col = mix(nightSide, daySide, dayAmt);
 
   // ocean specular highlight (spec map is bright on water)
   float specMask = texture2D(uSpec, vUv).r;
@@ -53,16 +56,26 @@ void main() {
 
 export function Earth() {
   const matRef = useRef<THREE.ShaderMaterial>(null)
-  const [day, night, spec] = useTexture([
-    '/textures/earth_atmos_2048.jpg',
-    '/textures/earth_lights_2048.png',
-    '/textures/earth_specular_2048.jpg',
-  ])
+  const qualityTier = useAppStore((s) => s.qualityTier)
+  // low tier sticks to the lighter 2K set; everyone else gets 4K NASA imagery
+  const [day, night, spec] = useTexture(
+    qualityTier === 'low'
+      ? [
+          '/textures/earth_atmos_2048.jpg',
+          '/textures/earth_lights_2048.png',
+          '/textures/earth_specular_2048.jpg',
+        ]
+      : [
+          '/textures/earth_day_4k.jpg',
+          '/textures/earth_night_4k.jpg',
+          '/textures/earth_specular_2048.jpg',
+        ],
+  )
 
   const uniforms = useMemo(() => {
     for (const t of [day, night, spec]) {
       t.colorSpace = THREE.SRGBColorSpace
-      t.anisotropy = 4
+      t.anisotropy = 8
     }
     return {
       uDay: { value: day },

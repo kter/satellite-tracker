@@ -5,6 +5,7 @@ import { Stars } from '@react-three/drei'
 import { Earth } from './Earth'
 import { Atmosphere } from './Atmosphere'
 import { Satellites } from './Satellites'
+import { SatLabels } from './SatLabels'
 import { SelectedMarker } from './SelectedMarker'
 import { OrbitLine } from './OrbitLine'
 import { UserMarker } from './UserMarker'
@@ -92,6 +93,7 @@ export function SceneRoot() {
       <Earth />
       <Atmosphere />
       <Satellites />
+      <SatLabels />
       <SelectedMarker />
       <OrbitLine />
       <UserMarker />

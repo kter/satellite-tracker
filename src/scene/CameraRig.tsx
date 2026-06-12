@@ -32,7 +32,7 @@ export function CameraRig() {
       ref={ref}
       makeDefault
       smoothTime={0.45}
-      minDistance={EARTH_RADIUS_UNITS + 0.4}
+      minDistance={EARTH_RADIUS_UNITS + 0.08}
       maxDistance={80}
       draggingSmoothTime={0.08}
     />

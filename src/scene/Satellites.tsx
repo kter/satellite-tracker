@@ -71,6 +71,7 @@ export function Satellites() {
     }
     overheadFlags.current = new Uint8Array(count)
     renderBuffers.visible = visible
+    renderBuffers.states = states
     renderBuffers.count = count
     return { positions, colors, states, visible, count }
   }, [catalog])

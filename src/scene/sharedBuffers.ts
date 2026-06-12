@@ -10,10 +10,13 @@ export const renderBuffers: {
   velocities: Float32Array | null
   /** per-sat category-filter visibility, 1 = visible */
   visible: Uint8Array | null
+  /** per-sat draw state: -1 hidden / 0 normal / 1 dimmed / 2 overhead-highlight */
+  states: Float32Array | null
   count: number
 } = {
   positions: null,
   velocities: null,
   visible: null,
+  states: null,
   count: 0,
 }

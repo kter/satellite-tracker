@@ -26,6 +26,8 @@ export interface AppState {
   userLocation: UserLocation | null
   cameraMode: CameraMode
   overheadCount: number
+  /** satellite name labels drawn this frame (E2E assertion surface) */
+  labelCount: number
   qualityTier: QualityTier
   toast: string | null
 
@@ -42,6 +44,7 @@ export interface AppState {
   enterOverhead: (loc: UserLocation) => void
   exitOverhead: () => void
   setOverheadCount: (n: number) => void
+  setLabelCount: (n: number) => void
   setCameraMode: (m: CameraMode) => void
   showToast: (msg: string) => void
   clearToast: () => void
@@ -62,6 +65,7 @@ export const useAppStore = create<AppState>((set) => ({
   userLocation: null,
   cameraMode: 'free',
   overheadCount: 0,
+  labelCount: 0,
   qualityTier: pickQualityTier(readDeviceInfo()),
   toast: null,
 
@@ -83,6 +87,7 @@ export const useAppStore = create<AppState>((set) => ({
   enterOverhead: (userLocation) => set({ userLocation, cameraMode: 'overhead' }),
   exitOverhead: () => set({ cameraMode: 'free', overheadCount: 0 }),
   setOverheadCount: (overheadCount) => set({ overheadCount }),
+  setLabelCount: (labelCount) => set({ labelCount }),
   setCameraMode: (cameraMode) => set({ cameraMode }),
   showToast: (toast) => set({ toast }),
   clearToast: () => set({ toast: null }),

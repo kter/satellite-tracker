@@ -3,9 +3,10 @@ FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
-COPY tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts vitest.config.ts index.html ./
+COPY tsconfig.json tsconfig.app.json tsconfig.node.json tsconfig.e2e.json vite.config.ts vitest.config.ts playwright.config.ts index.html ./
 COPY public ./public
 COPY src ./src
+COPY tests ./tests
 RUN npm run build
 
 # Stage 2: serve with nginx

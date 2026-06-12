@@ -22,17 +22,21 @@ export const snapshotRef: { current: Snapshot | null } = { current: null }
 interface OrbitState {
   noradId: number | null
   periodMin: number
+  /** sim time at the center of the sampled window */
+  sampledAtMs: number
   points: Float32Array | null
-  setOrbit: (noradId: number, periodMin: number, points: Float32Array) => void
+  setOrbit: (noradId: number, periodMin: number, sampledAtMs: number, points: Float32Array) => void
   clearOrbit: () => void
 }
 
 export const useOrbitStore = create<OrbitState>((set) => ({
   noradId: null,
   periodMin: 0,
+  sampledAtMs: 0,
   points: null,
-  setOrbit: (noradId, periodMin, points) => set({ noradId, periodMin, points }),
-  clearOrbit: () => set({ noradId: null, points: null, periodMin: 0 }),
+  setOrbit: (noradId, periodMin, sampledAtMs, points) =>
+    set({ noradId, periodMin, sampledAtMs, points }),
+  clearOrbit: () => set({ noradId: null, points: null, periodMin: 0, sampledAtMs: 0 }),
 }))
 
 let workerSingleton: Worker | null = null
@@ -81,7 +85,7 @@ export function usePropagator(): void {
           }
           break
         case 'orbit':
-          useOrbitStore.getState().setOrbit(msg.noradId, msg.periodMin, msg.points)
+          useOrbitStore.getState().setOrbit(msg.noradId, msg.periodMin, msg.sampledAtMs, msg.points)
           break
       }
     }
