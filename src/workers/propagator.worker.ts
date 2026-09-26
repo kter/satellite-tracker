@@ -1,29 +1,18 @@
-import { twoline2satrec, propagate, gstime, type SatRec } from 'satellite.js'
+import { twoline2satrec, gstime, type SatRec } from 'satellite.js'
 import type { MainToWorker, WorkerToMain } from './protocol'
-import { ecefKmToScene } from '../lib/geo'
 import { deriveSatMeta, packMeta } from '../lib/satMeta'
 import { CATEGORY_INDEX } from '../lib/groups'
-import { computeScenePosVel } from '../lib/propagation'
-
-interface WorkerClock {
-  baseSimMs: number
-  baseRealMs: number
-  multiplier: number
-  paused: boolean
-}
+import { computeScenePosVel, sampleOrbitEci } from '../lib/propagation'
+import { clockFromSync, makeClock, simNow, type ClockState } from '../lib/time'
 
 let satrecs: SatRec[] = []
-let dead: Uint8Array = new Uint8Array(0)
+/** 1 once SGP4 has failed for a satellite; it is never propagated again */
+let propagationFailed: Uint8Array = new Uint8Array(0)
 let count = 0
-let clock: WorkerClock = { baseSimMs: 0, baseRealMs: 0, multiplier: 1, paused: false }
+let clock: ClockState = makeClock(0, 0)
 let timer: ReturnType<typeof setTimeout> | null = null
 /** adaptive propagation interval; ≥ 2× measured wall time so the worker idles ≥ 50% */
 let intervalMs = 250
-
-function simNow(): number {
-  if (clock.paused) return clock.baseSimMs
-  return clock.baseSimMs + (performance.now() - clock.baseRealMs) * clock.multiplier
-}
 
 function post(msg: WorkerToMain, transfer: Transferable[] = []) {
   ;(postMessage as (m: WorkerToMain, t: Transferable[]) => void)(msg, transfer)
@@ -31,18 +20,18 @@ function post(msg: WorkerToMain, transfer: Transferable[] = []) {
 
 function propagateAll() {
   const t0 = performance.now()
-  const simMs = simNow()
+  const simMs = simNow(clock, performance.now())
   const date = new Date(simMs)
   const gmst = gstime(date)
   const positions = new Float32Array(count * 3)
   const velocities = new Float32Array(count * 3)
 
   for (let i = 0; i < count; i++) {
-    if (dead[i]) continue
+    if (propagationFailed[i]) continue
     const pv = computeScenePosVel(satrecs[i], date, gmst)
     if (!pv) {
-      dead[i] = 1
-      // dead satellites stay parked at the origin (inside the Earth, never visible)
+      propagationFailed[i] = 1
+      // failed satellites stay parked at the origin (inside the Earth, never visible)
       continue
     }
     positions.set(pv.position, i * 3)
@@ -64,29 +53,14 @@ function loop() {
 
 function sampleOrbit(noradId: number, samples: number, simTimeMs: number) {
   const idx = satrecs.findIndex((r) => Number(r.satnum) === noradId)
-  if (idx < 0 || dead[idx]) return
+  if (idx < 0 || propagationFailed[idx]) return
   const rec = satrecs[idx]
   const meta = deriveSatMeta(rec)
-  const periodMs = meta.periodMin * 60 * 1000
   // ECI ellipse (no per-sample gmst): the renderer counter-rotates the whole
   // line by -gmst(simTime) so it stays consistent with the Earth-fixed scene.
   // The window is centered on simTimeMs (±T/2) so the open seam left by J2
   // precession sits at the antipode instead of right at the satellite.
-  const points = new Float32Array((samples + 1) * 3)
-  for (let s = 0; s <= samples; s++) {
-    const t = simTimeMs + periodMs * (s / samples - 0.5)
-    let pv: ReturnType<typeof propagate>
-    try {
-      pv = propagate(rec, new Date(t))
-    } catch {
-      continue
-    }
-    if (!pv || typeof pv.position === 'boolean') continue
-    const [x, y, z] = ecefKmToScene(pv.position.x, pv.position.y, pv.position.z)
-    points[s * 3] = x
-    points[s * 3 + 1] = y
-    points[s * 3 + 2] = z
-  }
+  const points = sampleOrbitEci(rec, simTimeMs, meta.periodMin * 60 * 1000, samples)
   post({ type: 'orbit', noradId, periodMin: meta.periodMin, sampledAtMs: simTimeMs, points }, [
     points.buffer,
   ])
@@ -117,13 +91,8 @@ onmessage = (ev: MessageEvent<MainToWorker>) => {
         n++
       }
       count = n
-      dead = new Uint8Array(count)
-      clock = {
-        baseSimMs: msg.simTimeMs,
-        baseRealMs: performance.now(),
-        multiplier: msg.multiplier,
-        paused: msg.paused,
-      }
+      propagationFailed = new Uint8Array(count)
+      clock = clockFromSync(msg.clock, performance.now())
       post({
         type: 'ready',
         count,
@@ -137,12 +106,7 @@ onmessage = (ev: MessageEvent<MainToWorker>) => {
       break
     }
     case 'timeSync': {
-      clock = {
-        baseSimMs: msg.simTimeMs,
-        baseRealMs: performance.now(),
-        multiplier: msg.multiplier,
-        paused: msg.paused,
-      }
+      clock = clockFromSync(msg.clock, performance.now())
       // re-propagate immediately so jumps (pause, reset-to-now) take effect fast
       if (timer) {
         clearTimeout(timer)

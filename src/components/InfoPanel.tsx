@@ -3,29 +3,12 @@ import { useAppStore } from '../state/store'
 import { renderBuffers } from '../scene/sharedBuffers'
 import { unpackMeta } from '../lib/satMeta'
 import { CATEGORY_ORDER } from '../lib/groups'
-import { KM_PER_UNIT, EARTH_RADIUS_KM } from '../lib/geo'
-
-/** Earth rotation rate (rad/s) — used to convert stored ECF velocity back to inertial speed. */
-const OMEGA_EARTH = 7.2921159e-5
-
-interface LiveValues {
-  altitudeKm: number
-  speedKms: number
-}
+import { liveValuesAt, type LiveValues } from '../lib/propagation'
 
 function readLiveValues(index: number): LiveValues | null {
   const { positions, velocities, count } = renderBuffers
   if (!positions || !velocities || index >= count) return null
-  const x = positions[index * 3]
-  const y = positions[index * 3 + 1]
-  const z = positions[index * 3 + 2]
-  const vx = velocities[index * 3] + OMEGA_EARTH * z
-  const vy = velocities[index * 3 + 1]
-  const vz = velocities[index * 3 + 2] - OMEGA_EARTH * x
-  return {
-    altitudeKm: Math.hypot(x, y, z) * KM_PER_UNIT - EARTH_RADIUS_KM,
-    speedKms: Math.hypot(vx, vy, vz) * KM_PER_UNIT,
-  }
+  return liveValuesAt(positions, velocities, index)
 }
 
 export function InfoPanel() {

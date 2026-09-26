@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import * as THREE from 'three'
 import { Canvas, useThree } from '@react-three/fiber'
 import { Stars } from '@react-three/drei'
 import { Earth } from './Earth'
@@ -11,6 +10,8 @@ import { OrbitLine } from './OrbitLine'
 import { UserMarker } from './UserMarker'
 import { CameraRig } from './CameraRig'
 import { renderBuffers } from './sharedBuffers'
+import { cameraProjection } from './cameraProjection'
+import { HOME_POSITION } from './cameraBus'
 import { pickSatellite } from '../lib/picking'
 import { useAppStore } from '../state/store'
 import { dprFor } from '../lib/device'
@@ -39,18 +40,12 @@ function PickingHandler() {
       const { positions, visible, count } = renderBuffers
       if (!positions || count === 0) return
 
-      camera.updateMatrixWorld()
-      const viewProjection = new THREE.Matrix4().multiplyMatrices(
-        camera.projectionMatrix,
-        camera.matrixWorldInverse,
-      ).elements
       const rect = el.getBoundingClientRect()
       const index = pickSatellite({
         positions,
         count,
         visible,
-        viewProjection,
-        cameraPosition: [camera.position.x, camera.position.y, camera.position.z],
+        ...cameraProjection(camera),
         pointerX: ev.clientX - rect.left,
         pointerY: ev.clientY - rect.top,
         viewportWidth: rect.width,
@@ -77,7 +72,7 @@ export function SceneRoot() {
   return (
     <Canvas
       dpr={dprFor(qualityTier, typeof devicePixelRatio === 'number' ? devicePixelRatio : 1)}
-      camera={{ fov: 45, near: 0.01, far: 1000, position: [0, 5, 17] }}
+      camera={{ fov: 45, near: 0.01, far: 1000, position: HOME_POSITION }}
       gl={{ powerPreference: 'high-performance', antialias: true }}
       style={{ position: 'absolute', inset: 0, background: '#05070d', touchAction: 'none' }}
     >

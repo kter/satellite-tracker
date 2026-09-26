@@ -13,6 +13,8 @@ import {
   OVERHEAD_TILT_RAD,
   OVERHEAD_DISTANCE_UNITS,
   EARTH_RADIUS_UNITS,
+  FREE_MIN_CAMERA_DISTANCE_UNITS,
+  OVERHEAD_MIN_CAMERA_DISTANCE_UNITS,
 } from './geo'
 
 describe('latLonAltToEcefKm (WGS84)', () => {
@@ -136,5 +138,44 @@ describe('overheadCamera (oblique GPS view)', () => {
   it('works at the pole without NaN', () => {
     const { position, target } = overheadCamera(90, 0)
     for (const v of [...position, ...target]) expect(Number.isFinite(v)).toBe(true)
+  })
+})
+
+describe('camera zoom limits per mode', () => {
+  it('lets the free camera approach to ~80 km above the surface (target = Earth center)', () => {
+    const altitudeKm = (FREE_MIN_CAMERA_DISTANCE_UNITS - EARTH_RADIUS_UNITS) * 1000
+    expect(altitudeKm).toBeCloseTo(80, 0)
+  })
+
+  it('never exceeds the initial overhead camera-to-target distance (zooming in must not push out)', () => {
+    for (const [lat, lon] of [
+      [35.68, 139.77],
+      [-33.87, 151.21],
+      [89.9, 0],
+    ]) {
+      const { position, target } = overheadCamera(lat, lon)
+      const d = Math.hypot(
+        position[0] - target[0],
+        position[1] - target[1],
+        position[2] - target[2],
+      )
+      expect(OVERHEAD_MIN_CAMERA_DISTANCE_UNITS).toBeLessThan(d)
+    }
+  })
+
+  it('keeps the overhead camera above the ground at the zoom limit', () => {
+    const { position, target } = overheadCamera(35.68, 139.77)
+    const dir = normalize([
+      position[0] - target[0],
+      position[1] - target[1],
+      position[2] - target[2],
+    ])
+    const m = OVERHEAD_MIN_CAMERA_DISTANCE_UNITS
+    const closest: [number, number, number] = [
+      target[0] + dir[0] * m,
+      target[1] + dir[1] * m,
+      target[2] + dir[2] * m,
+    ]
+    expect(Math.hypot(...closest)).toBeGreaterThan(EARTH_RADIUS_UNITS)
   })
 })

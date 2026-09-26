@@ -1,18 +1,15 @@
 import type { SatSource } from '../types'
+import type { ClockSync } from '../lib/time'
 
 export interface InitMessage {
   type: 'init'
   sats: SatSource[]
-  simTimeMs: number
-  multiplier: number
-  paused: boolean
+  clock: ClockSync
 }
 
 export interface TimeSyncMessage {
   type: 'timeSync'
-  simTimeMs: number
-  multiplier: number
-  paused: boolean
+  clock: ClockSync
 }
 
 export interface RequestOrbitMessage {

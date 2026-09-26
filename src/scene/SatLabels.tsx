@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
-import { renderBuffers } from './sharedBuffers'
+import { frameStats, renderBuffers } from './sharedBuffers'
+import { cameraProjection } from './cameraProjection'
 import { selectLabels } from '../lib/labels'
 import { useAppStore } from '../state/store'
 
@@ -18,8 +18,6 @@ export function SatLabels() {
   const camera = useThree((s) => s.camera)
   const overlayRef = useRef<HTMLCanvasElement | null>(null)
   const frame = useRef(0)
-  const viewProjection = useRef(new THREE.Matrix4())
-  const lastCount = useRef(-1)
 
   useEffect(() => {
     const overlay = document.createElement('canvas')
@@ -61,15 +59,12 @@ export function SatLabels() {
     const catalog = state.catalog
     let labels: ReturnType<typeof selectLabels> = []
     if (positions && catalog && count > 0 && w > 0 && h > 0) {
-      camera.updateMatrixWorld()
-      viewProjection.current.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
       labels = selectLabels({
         positions,
         count,
         states,
         selectedIndex: state.selectedIndex,
-        viewProjection: viewProjection.current.elements,
-        cameraPosition: [camera.position.x, camera.position.y, camera.position.z],
+        ...cameraProjection(camera),
         viewportWidth: w,
         viewportHeight: h,
       })
@@ -84,10 +79,8 @@ export function SatLabels() {
         ctx.fillText(name, l.x + 9, l.y)
       }
     }
-    if (labels.length !== lastCount.current) {
-      lastCount.current = labels.length
-      state.setLabelCount(labels.length)
-    }
+    // read by useFrameStatsSync — never setState from the frame loop
+    frameStats.labelCount = labels.length
   })
 
   return null

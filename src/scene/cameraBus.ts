@@ -1,5 +1,5 @@
 import type CameraControls from 'camera-controls'
-import { overheadCamera, latLonToScene, normalize, EARTH_RADIUS_UNITS } from '../lib/geo'
+import { overheadCamera, normalize, EARTH_RADIUS_UNITS } from '../lib/geo'
 import type { UserLocation } from '../types'
 
 export const HOME_POSITION: [number, number, number] = [0, 5, 17]
@@ -32,8 +32,4 @@ export function flyToSatellite(satPos: [number, number, number]): void {
   const dir = normalize(satPos)
   if (dir[0] === 0 && dir[1] === 0 && dir[2] === 0) return
   void controls.setLookAt(dir[0] * dist, dir[1] * dist, dir[2] * dist, 0, 0, 0, true)
-}
-
-export function userMarkerPosition(loc: UserLocation): [number, number, number] {
-  return latLonToScene(loc.latDeg, loc.lonDeg)
 }

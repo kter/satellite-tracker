@@ -8,6 +8,9 @@ export interface SatDebug {
   overheadCount: number
   labelCount: number
   cameraMode: string
+  /** per-category filter state, indexed like CATEGORY_ORDER */
+  enabledCategories: boolean[]
+  toast: string | null
   multiplier: number
   paused: boolean
   usedStaleCache: boolean
@@ -35,6 +38,8 @@ export function installDebugApi(): void {
       overheadCount: s.overheadCount,
       labelCount: s.labelCount,
       cameraMode: s.cameraMode,
+      enabledCategories: s.enabledCategories,
+      toast: s.toast,
       multiplier: s.clock.multiplier,
       paused: s.clock.paused,
       usedStaleCache: s.usedStaleCache,

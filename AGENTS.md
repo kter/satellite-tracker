@@ -21,8 +21,15 @@ oblique camera angle.
 
 - Coordinate frame is Earth-fixed (ECF); the globe never rotates. The SGP4 worker
   (`src/workers/propagator.worker.ts`) converts ECI→ECF→scene units (1 unit = 1000 km,
-  axis remap in `src/lib/geo.ts`). The main thread linearly extrapolates positions
-  between worker snapshots — never propagate on the main thread.
+  axis remap in `src/lib/geo.ts`). Between worker snapshots the main thread extrapolates
+  along the local circular two-body arc (`extrapolateStates` in
+  `src/lib/propagation.ts`) — never run SGP4 on the main thread.
+- Beyond the original spec, and kept on purpose: ocean specular + limb glow in the Earth
+  shader, the pulsing user pin, and the stale-cache fallback when CelesTrak refetch fails.
+- Satellite count is capped per quality tier (`satBudget` in `src/lib/device.ts`): only the
+  `high` tier shows the full ~10k catalog.
+- Frame-loop counters (label/overhead counts) go into `frameStats`
+  (`src/scene/sharedBuffers.ts`); `useFrameStatsSync` mirrors them into the store at 4 Hz.
 - Never call React `setState` inside `useFrame`; live readouts poll on ≤4 Hz intervals.
 - TLE data comes from CelesTrak via `src/lib/groups.ts`/`src/lib/tle.ts` with a 2 h
   localStorage cache. E2E tests intercept these URLs with fixtures — keep all CelesTrak

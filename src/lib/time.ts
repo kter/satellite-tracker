@@ -37,3 +37,24 @@ export function setPaused(c: ClockState, paused: boolean, nowRealMs: number): Cl
 export function resetToNow(c: ClockState, nowSimMs: number, nowRealMs: number): ClockState {
   return { ...c, baseSimMs: nowSimMs, baseRealMs: nowRealMs }
 }
+
+/** Wire form of a clock: what the main thread sends the worker. */
+export interface ClockSync {
+  simTimeMs: number
+  multiplier: number
+  paused: boolean
+}
+
+export function clockSyncAt(c: ClockState, nowRealMs: number): ClockSync {
+  return { simTimeMs: simNow(c, nowRealMs), multiplier: c.multiplier, paused: c.paused }
+}
+
+/** Rebuild a clock from its wire form, anchored at the receiver's wall clock. */
+export function clockFromSync(sync: ClockSync, nowRealMs: number): ClockState {
+  return {
+    baseSimMs: sync.simTimeMs,
+    baseRealMs: nowRealMs,
+    multiplier: sync.multiplier,
+    paused: sync.paused,
+  }
+}

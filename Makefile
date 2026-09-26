@@ -88,7 +88,7 @@ tf-output: tf-switch ## Show Terraform outputs for ENV
 	cd terraform && $(MISE) terraform output
 
 .PHONY: deploy
-deploy: tf-switch build ## Build and deploy frontend to ENV (S3 sync + CloudFront invalidation)
+deploy: test-unit tf-switch build ## Unit-test, build and deploy frontend to ENV (S3 sync + CloudFront invalidation)
 	@bucket=$$(cd terraform && $(MISE) terraform output -raw frontend_bucket_name); \
 	dist_id=$$(cd terraform && $(MISE) terraform output -raw cloudfront_distribution_id); \
 	echo "Deploying dist/ to s3://$$bucket (profile $(ENV))"; \

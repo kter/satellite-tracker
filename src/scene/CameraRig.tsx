@@ -3,7 +3,7 @@ import { CameraControls } from '@react-three/drei'
 import type CameraControlsImpl from 'camera-controls'
 import { useAppStore } from '../state/store'
 import { controlsRef, flyToOverhead, flyHome, HOME_POSITION } from './cameraBus'
-import { EARTH_RADIUS_UNITS } from '../lib/geo'
+import { FREE_MIN_CAMERA_DISTANCE_UNITS, OVERHEAD_MIN_CAMERA_DISTANCE_UNITS } from '../lib/geo'
 
 export function CameraRig() {
   const ref = useRef<CameraControlsImpl>(null)
@@ -32,7 +32,11 @@ export function CameraRig() {
       ref={ref}
       makeDefault
       smoothTime={0.45}
-      minDistance={EARTH_RADIUS_UNITS + 0.08}
+      minDistance={
+        cameraMode === 'overhead'
+          ? OVERHEAD_MIN_CAMERA_DISTANCE_UNITS
+          : FREE_MIN_CAMERA_DISTANCE_UNITS
+      }
       maxDistance={80}
       draggingSmoothTime={0.08}
     />
