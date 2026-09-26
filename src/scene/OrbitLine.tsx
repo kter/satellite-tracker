@@ -4,7 +4,8 @@ import { useFrame } from '@react-three/fiber'
 import { Line } from '@react-three/drei'
 import { gstime } from 'satellite.js'
 import { useAppStore, currentSimTimeMs } from '../state/store'
-import { useOrbitStore, requestOrbit } from '../hooks/usePropagator'
+import { requestOrbit } from '../hooks/usePropagator'
+import { useOrbitStore } from '../state/orbitStore'
 
 /** Resample once sim time drifts this far (fraction of a period) from the window center. */
 const RESAMPLE_PERIOD_FRACTION = 1 / 6
@@ -34,7 +35,8 @@ export function OrbitLine() {
   }, [selectedNoradId])
 
   const points = useMemo(() => {
-    if (!orbit.points || orbit.noradId !== selectedNoradId) return null
+    // a line needs ≥ 2 points; SGP4 may reject most samples of a decaying orbit
+    if (!orbit.points || orbit.points.length < 6 || orbit.noradId !== selectedNoradId) return null
     const arr: [number, number, number][] = []
     for (let i = 0; i < orbit.points.length; i += 3) {
       arr.push([orbit.points[i], orbit.points[i + 1], orbit.points[i + 2]])

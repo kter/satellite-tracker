@@ -6,11 +6,11 @@
 export const renderBuffers: {
   /** extrapolated scene positions actually rendered this frame */
   positions: Float32Array | null
-  /** latest worker velocities (scene units / sim second) */
+  /** Earth-fixed velocities matching `positions` (scene units / sim second) */
   velocities: Float32Array | null
   /** per-sat category-filter visibility, 1 = visible */
   visible: Uint8Array | null
-  /** per-sat draw state: -1 hidden / 0 normal / 1 dimmed / 2 overhead-highlight */
+  /** per-sat DrawState (see lib/drawState) */
   states: Float32Array | null
   count: number
 } = {
@@ -19,4 +19,15 @@ export const renderBuffers: {
   visible: null,
   states: null,
   count: 0,
+}
+
+/**
+ * Counters produced inside useFrame. Never pushed to the store from the frame
+ * loop — useFrameStatsSync mirrors them into React state at ≤ 4 Hz.
+ */
+export const frameStats = {
+  /** satellite name labels drawn in the latest label pass */
+  labelCount: 0,
+  /** satellites above the minimum elevation at the user location */
+  overheadCount: 0,
 }

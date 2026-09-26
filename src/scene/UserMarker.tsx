@@ -25,7 +25,7 @@ export function UserMarker() {
       upVec.clone().negate(),
     )
     const conePos = new THREE.Vector3(...p).addScaledVector(upVec, CONE_HEIGHT / 2)
-    return { p: new THREE.Vector3(...p), quat, conePos }
+    return { pinPosition: new THREE.Vector3(...p), quat, conePos }
   }, [userLocation])
 
   useFrame(({ clock }) => {
@@ -40,7 +40,7 @@ export function UserMarker() {
 
   return (
     <group>
-      <mesh ref={pinRef} position={placement.p}>
+      <mesh ref={pinRef} position={placement.pinPosition}>
         <sphereGeometry args={[0.018, 16, 16]} />
         <meshBasicMaterial color="#ff7d4d" />
       </mesh>

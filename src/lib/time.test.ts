@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { makeClock, simNow, setMultiplier, setPaused, resetToNow, MULTIPLIERS } from './time'
+import {
+  makeClock,
+  simNow,
+  setMultiplier,
+  setPaused,
+  resetToNow,
+  clockFromSync,
+  clockSyncAt,
+  MULTIPLIERS,
+} from './time'
 
 const T0_SIM = 1_700_000_000_000
 const T0_REAL = 10_000
@@ -51,5 +60,21 @@ describe('SimClock', () => {
 
   it('exposes the expected multiplier presets', () => {
     expect([...MULTIPLIERS]).toEqual([1, 10, 60, 600])
+  })
+})
+
+describe('ClockSync', () => {
+  it('roundtrips a clock through its wire form without a jump', () => {
+    let c = makeClock(T0_SIM, T0_REAL)
+    c = setMultiplier(c, 60, T0_REAL)
+    const sync = clockSyncAt(c, T0_REAL + 1000)
+    expect(sync).toEqual({ simTimeMs: T0_SIM + 60_000, multiplier: 60, paused: false })
+    const mirrored = clockFromSync(sync, 5)
+    expect(simNow(mirrored, 5 + 1000)).toBe(T0_SIM + 120_000)
+  })
+
+  it('keeps a paused mirror frozen', () => {
+    const mirrored = clockFromSync({ simTimeMs: T0_SIM, multiplier: 600, paused: true }, 0)
+    expect(simNow(mirrored, 99_999)).toBe(T0_SIM)
   })
 })

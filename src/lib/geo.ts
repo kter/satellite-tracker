@@ -88,10 +88,23 @@ export interface ObliqueCamera {
 
 /** Camera tilt off the zenith axis. 0 would be a straight top-down view. */
 export const OVERHEAD_TILT_RAD = (38 * Math.PI) / 180
-/** Camera distance from the user location, in scene units (≈ 14,000 km). */
+/** Camera distance from the user location, in scene units (≈ 2,200 km). */
 export const OVERHEAD_DISTANCE_UNITS = 2.2
 /** Aim a little above the user so the LEO shell sits mid-frame. */
 export const OVERHEAD_TARGET_LIFT_UNITS = 0.4
+
+/*
+ * Closest the camera may dolly to its orbit target. camera-controls measures
+ * this from the target, not the Earth's center, so each camera mode needs its
+ * own limit.
+ */
+/** Free mode orbits the Earth's center → ~80 km above the surface. */
+export const FREE_MIN_CAMERA_DISTANCE_UNITS = EARTH_RADIUS_UNITS + 0.08
+/**
+ * Overhead mode orbits a point above the user; the limit must stay below the
+ * overhead framing distance or the first zoom-in would snap the camera outward.
+ */
+export const OVERHEAD_MIN_CAMERA_DISTANCE_UNITS = 0.2
 
 /**
  * Oblique "overhead" camera for a ground location: positioned off-zenith by

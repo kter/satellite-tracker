@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
-import { create } from 'zustand'
 import type { SatSource } from '../types'
-import type { WorkerToMain } from '../workers/protocol'
+import type { MainToWorker, WorkerToMain } from '../workers/protocol'
 import { fetchAllTles } from '../lib/tle'
 import { applyBudget, satBudget } from '../lib/device'
 import { useAppStore, currentSimTimeMs } from '../state/store'
+import { useOrbitStore } from '../state/orbitStore'
+import { clockSyncAt, type ClockSync } from '../lib/time'
 
 export interface Snapshot {
   positions: Float32Array
@@ -19,30 +20,19 @@ export interface Snapshot {
  */
 export const snapshotRef: { current: Snapshot | null } = { current: null }
 
-interface OrbitState {
-  noradId: number | null
-  periodMin: number
-  /** sim time at the center of the sampled window */
-  sampledAtMs: number
-  points: Float32Array | null
-  setOrbit: (noradId: number, periodMin: number, sampledAtMs: number, points: Float32Array) => void
-  clearOrbit: () => void
-}
-
-export const useOrbitStore = create<OrbitState>((set) => ({
-  noradId: null,
-  periodMin: 0,
-  sampledAtMs: 0,
-  points: null,
-  setOrbit: (noradId, periodMin, sampledAtMs, points) =>
-    set({ noradId, periodMin, sampledAtMs, points }),
-  clearOrbit: () => set({ noradId: null, points: null, periodMin: 0, sampledAtMs: 0 }),
-}))
-
 let workerSingleton: Worker | null = null
 
+function post(worker: Worker | null, msg: MainToWorker): void {
+  worker?.postMessage(msg)
+}
+
+/** Current store clock in the wire form the worker mirrors. */
+function currentClockSync(): ClockSync {
+  return clockSyncAt(useAppStore.getState().clock, performance.now())
+}
+
 export function requestOrbit(noradId: number): void {
-  workerSingleton?.postMessage({
+  post(workerSingleton, {
     type: 'requestOrbit',
     noradId,
     samples: 256,
@@ -101,14 +91,7 @@ export function usePropagator(): void {
           satBudget(useAppStore.getState().qualityTier),
         )
         useAppStore.getState().setDataInfo(result.fetchedAt, result.usedStaleCache)
-        const clock = useAppStore.getState().clock
-        worker.postMessage({
-          type: 'init',
-          sats: budgeted,
-          simTimeMs: currentSimTimeMs(),
-          multiplier: clock.multiplier,
-          paused: clock.paused,
-        })
+        post(worker, { type: 'init', sats: budgeted, clock: currentClockSync() })
       } catch (err) {
         store.setLoadState('error', err instanceof Error ? err.message : String(err))
       }
@@ -116,29 +99,17 @@ export function usePropagator(): void {
     void load()
 
     // keep the worker clock mirrored on every multiplier/pause/reset change
+    const syncClock = () => post(worker, { type: 'timeSync', clock: currentClockSync() })
     let prevClock = useAppStore.getState().clock
     const unsubscribe = useAppStore.subscribe((s) => {
       if (s.clock !== prevClock) {
         prevClock = s.clock
-        worker.postMessage({
-          type: 'timeSync',
-          simTimeMs: currentSimTimeMs(),
-          multiplier: s.clock.multiplier,
-          paused: s.clock.paused,
-        })
+        syncClock()
       }
     })
 
     // periodic re-sync guards against drift between the two clocks
-    const interval = setInterval(() => {
-      const clock = useAppStore.getState().clock
-      worker.postMessage({
-        type: 'timeSync',
-        simTimeMs: currentSimTimeMs(),
-        multiplier: clock.multiplier,
-        paused: clock.paused,
-      })
-    }, 5000)
+    const interval = setInterval(syncClock, 5000)
 
     return () => {
       unsubscribe()

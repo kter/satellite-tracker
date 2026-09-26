@@ -3,15 +3,17 @@ import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useAppStore } from '../state/store'
 import { snapshotRef } from '../hooks/usePropagator'
-import { renderBuffers } from './sharedBuffers'
+import { frameStats, renderBuffers } from './sharedBuffers'
 import { CATEGORY_ORDER } from '../lib/groups'
 import { computeOverheadFlags } from '../lib/overhead'
 import { latLonToScene } from '../lib/geo'
 import { simNow } from '../lib/time'
+import { extrapolateStates } from '../lib/propagation'
+import { DrawState, DRAW_STATE_GLSL } from '../lib/drawState'
 
 const VERTEX = /* glsl */ `
+${DRAW_STATE_GLSL}
 attribute vec3 aColor;
-// -1 hidden / 0 normal / 1 dimmed / 2 overhead-highlight
 attribute float aState;
 uniform float uSize;
 uniform float uDpr;
@@ -20,12 +22,15 @@ varying float vAlpha;
 
 void main() {
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
-  float scale = aState > 1.5 ? 1.8 : 1.0;
+  bool hidden = aState < STATE_HIDDEN + 0.5;
+  bool overhead = aState > STATE_OVERHEAD - 0.5;
+  bool dimmed = abs(aState - STATE_DIMMED) < 0.5;
+  float scale = overhead ? 1.8 : 1.0;
   float size = clamp(uSize * scale / -mv.z, 1.5, 16.0) * uDpr;
-  gl_PointSize = aState < -0.5 ? 0.0 : size;
+  gl_PointSize = hidden ? 0.0 : size;
   gl_Position = projectionMatrix * mv;
   vColor = aColor;
-  vAlpha = aState < -0.5 ? 0.0 : (aState > 1.5 ? 1.0 : (aState > 0.5 ? 0.18 : 0.85));
+  vAlpha = hidden ? 0.0 : (overhead ? 1.0 : (dimmed ? 0.18 : 0.85));
 }
 `
 
@@ -43,7 +48,6 @@ void main() {
 `
 
 const OVERHEAD_REFRESH_FRAMES = 5
-const COUNT_PUSH_FRAMES = 30
 
 export function Satellites() {
   const catalog = useAppStore((s) => s.catalog)
@@ -53,12 +57,13 @@ export function Satellites() {
   const pointsRef = useRef<THREE.Points>(null)
   const frame = useRef(0)
   const overheadFlags = useRef<Uint8Array | null>(null)
-  const lastOverheadCount = useRef(-1)
+  const overheadActive = useRef(false)
 
   const buffers = useMemo(() => {
     if (!catalog) return null
     const count = catalog.count
     const positions = new Float32Array(count * 3)
+    const velocities = new Float32Array(count * 3)
     const colors = new Float32Array(count * 3)
     const states = new Float32Array(count)
     const visible = new Uint8Array(count).fill(1)
@@ -73,7 +78,7 @@ export function Satellites() {
     renderBuffers.visible = visible
     renderBuffers.states = states
     renderBuffers.count = count
-    return { positions, colors, states, visible, count }
+    return { positions, velocities, colors, states, visible, count }
   }, [catalog])
 
   const uniforms = useMemo(() => ({ uSize: { value: 26 }, uDpr: { value: dpr } }), [dpr])
@@ -94,11 +99,11 @@ export function Satellites() {
     const flags = overheadFlags.current
     for (let i = 0; i < buffers.count; i++) {
       if (!buffers.visible[i]) {
-        buffers.states[i] = -1
+        buffers.states[i] = DrawState.Hidden
       } else if (overheadMode && flags) {
-        buffers.states[i] = flags[i] ? 2 : 1
+        buffers.states[i] = flags[i] ? DrawState.Overhead : DrawState.Dimmed
       } else {
-        buffers.states[i] = 0
+        buffers.states[i] = DrawState.Normal
       }
     }
     const geo = pointsRef.current?.geometry
@@ -116,31 +121,25 @@ export function Satellites() {
     const dtSec = (simMs - snap.simTimeMs) / 1000
     const n = Math.min(buffers.count, snap.count)
     const pos = buffers.positions
-    for (let i = 0; i < n * 3; i++) {
-      pos[i] = snap.positions[i] + snap.velocities[i] * dtSec
-    }
+    extrapolateStates(pos, buffers.velocities, snap.positions, snap.velocities, n, dtSec)
     renderBuffers.positions = pos
-    renderBuffers.velocities = snap.velocities
+    renderBuffers.velocities = buffers.velocities
 
     const geo = pointsRef.current.geometry
     ;(geo.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true
 
     frame.current++
+    // the overhead count goes to frameStats; useFrameStatsSync pushes it to the store
     if (state.cameraMode === 'overhead' && state.userLocation && overheadFlags.current) {
+      overheadActive.current = true
       if (frame.current % OVERHEAD_REFRESH_FRAMES === 0) {
-        const p = latLonToScene(state.userLocation.latDeg, state.userLocation.lonDeg)
-        const found = computeOverheadFlags(pos, n, p, overheadFlags.current)
+        const userPos = latLonToScene(state.userLocation.latDeg, state.userLocation.lonDeg)
+        frameStats.overheadCount = computeOverheadFlags(pos, n, userPos, overheadFlags.current)
         writeStates()
-        if (
-          found !== lastOverheadCount.current &&
-          frame.current % COUNT_PUSH_FRAMES < OVERHEAD_REFRESH_FRAMES
-        ) {
-          lastOverheadCount.current = found
-          state.setOverheadCount(found)
-        }
       }
-    } else if (lastOverheadCount.current !== -1) {
-      lastOverheadCount.current = -1
+    } else if (overheadActive.current) {
+      overheadActive.current = false
+      frameStats.overheadCount = 0
       writeStates()
     }
   })

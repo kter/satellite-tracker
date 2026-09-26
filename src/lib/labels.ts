@@ -1,5 +1,6 @@
 import { isOccludedByEarth } from './picking'
 import type { Vec3 } from './geo'
+import { DrawState, isDrawState } from './drawState'
 
 /** Normal satellites get a name label only when the camera is this close to them. */
 export const LABEL_MAX_CAMERA_DISTANCE_UNITS = 4
@@ -21,7 +22,7 @@ export interface SelectLabelsInput {
   /** scene-space positions, 3 floats per satellite */
   positions: Float32Array
   count: number
-  /** per-sat draw state: -1 hidden, 0 normal, 1 dimmed, 2 overhead-highlight (null = all normal) */
+  /** per-sat DrawState (null = all normal) */
   states: Float32Array | null
   selectedIndex: number | null
   /** column-major 4x4 view-projection matrix */
@@ -56,16 +57,16 @@ export function selectLabels(input: SelectLabelsInput): LabelPlacement[] {
 
   const candidates: LabelPlacement[] = []
   for (let i = 0; i < count; i++) {
-    const state = states ? states[i] : 0
+    const state = states ? states[i] : DrawState.Normal
     const isSelected = i === selectedIndex
-    if (state < -0.5) continue // hidden by category filter
-    if (state > 0.5 && state < 1.5 && !isSelected) continue // dimmed in overhead mode
+    if (isDrawState(state, DrawState.Hidden)) continue // hidden by category filter
+    if (isDrawState(state, DrawState.Dimmed) && !isSelected) continue // dimmed in overhead mode
 
     const x = positions[i * 3]
     const y = positions[i * 3 + 1]
     const z = positions[i * 3 + 2]
     const dist = Math.hypot(x - cam[0], y - cam[1], z - cam[2])
-    const alwaysLabeled = isSelected || state > 1.5 // selected or overhead-highlighted
+    const alwaysLabeled = isSelected || isDrawState(state, DrawState.Overhead)
     if (!alwaysLabeled && dist > maxDistanceUnits) continue
 
     const w = m[3] * x + m[7] * y + m[11] * z + m[15]

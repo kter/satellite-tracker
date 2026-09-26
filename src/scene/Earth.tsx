@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import * as THREE from 'three'
 import { useFrame } from '@react-three/fiber'
 import { useTexture } from '@react-three/drei'
@@ -55,7 +55,6 @@ void main() {
 `
 
 export function Earth() {
-  const matRef = useRef<THREE.ShaderMaterial>(null)
   const qualityTier = useAppStore((s) => s.qualityTier)
   // low tier sticks to the lighter 2K set; everyone else gets 4K NASA imagery
   const [day, night, spec] = useTexture(
@@ -93,12 +92,7 @@ export function Earth() {
   return (
     <mesh>
       <sphereGeometry args={[EARTH_RADIUS_UNITS, 96, 96]} />
-      <shaderMaterial
-        ref={matRef}
-        vertexShader={VERTEX}
-        fragmentShader={FRAGMENT}
-        uniforms={uniforms}
-      />
+      <shaderMaterial vertexShader={VERTEX} fragmentShader={FRAGMENT} uniforms={uniforms} />
     </mesh>
   )
 }

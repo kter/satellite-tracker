@@ -58,7 +58,6 @@ export function pickSatellite(input: PickInput): number {
 
   let best = -1
   let bestDist = thresholdPx
-  let bestDepth = Infinity
 
   for (let i = 0; i < count; i++) {
     if (visible && visible[i] === 0) continue
@@ -79,13 +78,8 @@ export function pickSatellite(input: PickInput): number {
 
     if (isOccludedByEarth(cameraPosition, [x, y, z])) continue
 
-    const depth =
-      (x - cameraPosition[0]) ** 2 + (y - cameraPosition[1]) ** 2 + (z - cameraPosition[2]) ** 2
-    if (dist < bestDist || depth < bestDepth) {
-      best = i
-      bestDist = dist
-      bestDepth = depth
-    }
+    best = i
+    bestDist = dist
   }
   return best
 }

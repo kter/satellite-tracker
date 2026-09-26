@@ -7,7 +7,13 @@ import {
   degreesLat,
   degreesLong,
 } from 'satellite.js'
-import { computeScenePosVel, OMEGA_EARTH } from './propagation'
+import {
+  computeScenePosVel,
+  extrapolateStates,
+  liveValuesAt,
+  OMEGA_EARTH,
+  sampleOrbitEci,
+} from './propagation'
 import { KM_PER_UNIT, EARTH_RADIUS_KM, sceneToEcefKm } from './geo'
 import { ISS_L1, ISS_L2, ISS_EPOCH_MS, DECAYED_L1, DECAYED_L2 } from './__fixtures__/tleFixtures'
 
@@ -114,5 +120,103 @@ describe('computeScenePosVel', () => {
       }
     }
     expect(sawNull).toBe(true)
+  })
+})
+
+describe('extrapolateStates', () => {
+  function iss(dtSec: number) {
+    const rec = twoline2satrec(ISS_L1, ISS_L2)
+    const d0 = new Date(ISS_EPOCH_MS)
+    const d1 = new Date(ISS_EPOCH_MS + dtSec * 1000)
+    const a = computeScenePosVel(rec, d0, gstime(d0))!
+    const b = computeScenePosVel(rec, d1, gstime(d1))!
+    const pos = new Float32Array(3)
+    const vel = new Float32Array(3)
+    extrapolateStates(
+      pos,
+      vel,
+      new Float32Array(a.position),
+      new Float32Array(a.velocity),
+      1,
+      dtSec,
+    )
+    return { pos, vel, expected: b }
+  }
+
+  function errorKm(dtSec: number): number {
+    const { pos, expected: b } = iss(dtSec)
+    return (
+      Math.hypot(pos[0] - b.position[0], pos[1] - b.position[1], pos[2] - b.position[2]) *
+      KM_PER_UNIT
+    )
+  }
+
+  it('keeps the typical 600x span (150 sim-seconds) within a few km of SGP4', () => {
+    expect(errorKm(150)).toBeLessThan(5)
+  })
+
+  it('follows the curved orbit over a 1200 s span (2 s wall at 600x), unlike a straight line', () => {
+    expect(errorKm(1200)).toBeLessThan(60)
+  })
+
+  it('advances the Earth-fixed velocity along with the position', () => {
+    const { vel, expected: b } = iss(150)
+    const errorMs =
+      Math.hypot(vel[0] - b.velocity[0], vel[1] - b.velocity[1], vel[2] - b.velocity[2]) *
+      KM_PER_UNIT *
+      1000
+    expect(errorMs).toBeLessThan(20)
+  })
+
+  it('leaves satellites parked at the origin in place (no NaN)', () => {
+    const pos = new Float32Array(3).fill(9)
+    const vel = new Float32Array(3).fill(9)
+    extrapolateStates(pos, vel, new Float32Array(3), new Float32Array(3), 1, 100)
+    expect(Array.from(pos)).toEqual([0, 0, 0])
+    expect(Array.from(vel)).toEqual([0, 0, 0])
+  })
+})
+
+describe('liveValuesAt', () => {
+  it('reports ISS altitude and inertial speed from Earth-fixed buffers', () => {
+    const rec = twoline2satrec(ISS_L1, ISS_L2)
+    const date = new Date(ISS_EPOCH_MS)
+    const out = computeScenePosVel(rec, date, gstime(date))!
+    const live = liveValuesAt(new Float32Array(out.position), new Float32Array(out.velocity), 0)
+    expect(live.altitudeKm).toBeGreaterThan(350)
+    expect(live.altitudeKm).toBeLessThan(480)
+    expect(live.speedKms).toBeGreaterThan(7.4)
+    expect(live.speedKms).toBeLessThan(7.9)
+  })
+})
+
+describe('sampleOrbitEci', () => {
+  it('samples one full period centered on the given time', () => {
+    const rec = twoline2satrec(ISS_L1, ISS_L2)
+    const periodMs = ((2 * Math.PI) / rec.no) * 60_000
+    const points = sampleOrbitEci(rec, ISS_EPOCH_MS, periodMs, 64)
+    expect(points.length).toBe(65 * 3)
+    // center sample equals the ECI position at the center time
+    const pv = propagate(rec, new Date(ISS_EPOCH_MS))!
+    const p = pv.position as { x: number; y: number; z: number }
+    const mid = 32 * 3
+    expect(points[mid]).toBeCloseTo(p.x / KM_PER_UNIT, 4)
+    expect(points[mid + 1]).toBeCloseTo(p.z / KM_PER_UNIT, 4)
+    expect(points[mid + 2]).toBeCloseTo(-p.y / KM_PER_UNIT, 4)
+  })
+
+  it('drops samples SGP4 rejects instead of leaving spikes at the origin', () => {
+    let rec
+    try {
+      rec = twoline2satrec(DECAYED_L1, DECAYED_L2)
+    } catch {
+      return
+    }
+    const periodMs = ((2 * Math.PI) / rec.no) * 60_000
+    const points = sampleOrbitEci(rec, ISS_EPOCH_MS, periodMs, 64)
+    expect(points.length).toBeLessThan(65 * 3)
+    for (let i = 0; i < points.length; i += 3) {
+      expect(Math.hypot(points[i], points[i + 1], points[i + 2])).toBeGreaterThan(1)
+    }
   })
 })
