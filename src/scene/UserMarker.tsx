@@ -8,9 +8,15 @@ import { MIN_ELEVATION_DEG } from '../lib/overhead'
 const CONE_HEIGHT = 2.5
 const CONE_HALF_ANGLE_RAD = ((90 - MIN_ELEVATION_DEG) * Math.PI) / 180
 
-/** Pin + translucent zenith cone marking the "overhead" region at the user location. */
+/**
+ * Pin at the user location, plus a translucent zenith cone marking the
+ * "overhead" region while the overhead view is active. The cone is ~7,000 km
+ * wide at its rim, so it is hidden in free mode where it would loom over the
+ * globe from the far side.
+ */
 export function UserMarker() {
   const userLocation = useAppStore((s) => s.userLocation)
+  const showCone = useAppStore((s) => s.cameraMode === 'overhead')
   const pinRef = useRef<THREE.Mesh>(null)
 
   const placement = useMemo(() => {
@@ -45,7 +51,7 @@ export function UserMarker() {
         <meshBasicMaterial color="#ff7d4d" />
       </mesh>
       {/* zenith cone: apex at the user, opening upward; half-angle = 90° − min elevation */}
-      <mesh position={placement.conePos} quaternion={placement.quat}>
+      <mesh position={placement.conePos} quaternion={placement.quat} visible={showCone}>
         <coneGeometry args={[coneRadius, CONE_HEIGHT, 48, 1, true]} />
         <meshBasicMaterial
           color="#4da6ff"
